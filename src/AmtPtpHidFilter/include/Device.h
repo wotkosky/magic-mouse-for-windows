@@ -14,6 +14,28 @@ DEFINE_GUID(GUID_DEVICEINTERFACE_AmtPtpHidFilter,
 #define HID_VID_APPLE_USB 0x05ac
 #define HID_VID_APPLE_BT  0x004c
 #define HID_PID_MAGIC_TRACKPAD_2 0x0265
+#define HID_PID_MAGIC_MOUSE_2    0x0269
+
+// Magic Mouse 2 specific constants
+#define MM2_BT_HEADER_SIZE    14   // Bytes before finger data in BT report
+#define MM2_FINGER_SIZE       8    // Bytes per finger record
+#define MM2_BUTTON_OFFSET     1    // Button byte offset in report
+#define MM2_REPORT_ID         0x12 // Report ID for Magic Mouse 2
+
+// Magic Mouse 2 coordinate ranges
+#define MM2_X_MIN   -1100
+#define MM2_X_MAX    1258
+#define MM2_Y_MIN   -1589
+#define MM2_Y_MAX    2047
+
+// Magic Mouse 2 touch states
+#define MM2_TOUCH_STATE_NONE  0x00
+#define MM2_TOUCH_STATE_START 0x30
+#define MM2_TOUCH_STATE_DRAG  0x40
+
+// Magic Mouse 2 mouse delta offsets in BT report header
+#define MM2_MOUSE_DX_OFFSET   2   // bytes 2-3: relative X (16-bit signed LE)
+#define MM2_MOUSE_DY_OFFSET   4   // bytes 4-5: relative Y (16-bit signed LE)
 
 /* device-specific parameters */
 typedef struct _BCM5974_PARAM {
@@ -51,6 +73,7 @@ typedef struct _DEVICE_CONTEXT
 
     // Device State
     BOOLEAN DeviceConfigured;
+    BOOLEAN IsMagicMouse2;
 
     // PTP report specific
     LARGE_INTEGER   LastReportTime;

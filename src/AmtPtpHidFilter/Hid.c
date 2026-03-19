@@ -33,6 +33,13 @@ PtpFilterGetHidDescriptor(
 			pSelectedHidDescriptor = &PtpDefaultHidDescriptorMagicTrackpad2;
 			break;
 		}
+		case HID_PID_MAGIC_MOUSE_2:
+		{
+			TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_HID, "%!FUNC! Request HID Report Descriptor for Apple Magic Mouse 2");
+			hidDescriptorSize = PtpDefaultHidDescriptorMagicMouse2.bLength;
+			pSelectedHidDescriptor = &PtpDefaultHidDescriptorMagicMouse2;
+			break;
+		}
 	}
 
 	if (pSelectedHidDescriptor != NULL && hidDescriptorSize > 0) {
@@ -115,6 +122,12 @@ PtpFilterGetReportDescriptor(
 		{
 			hidDescriptorSize = PtpDefaultHidDescriptorMagicTrackpad2.DescriptorList[0].wReportLength;
 			selectedHidDescriptor = PtpReportDescriptorMagicTrackpad2;
+			break;
+		}
+		case HID_PID_MAGIC_MOUSE_2:
+		{
+			hidDescriptorSize = PtpDefaultHidDescriptorMagicMouse2.DescriptorList[0].wReportLength;
+			selectedHidDescriptor = PtpReportDescriptorMagicMouse2;
 			break;
 		}
 	}

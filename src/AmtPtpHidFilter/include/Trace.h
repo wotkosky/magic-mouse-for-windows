@@ -1,51 +1,29 @@
-// Trace.h: Defines WPP tracing control bits.
+// Trace.h: Tracing stubs (WPP disabled for manual build)
 
 #pragma once
 
-//
-// Define the tracing flags.
-//
-// Tracing GUID - eeb34803-f3ec-4bb1-97ce-b42405d7f3c2
-//
+// Trace level constants (from evntrace.h)
+#define TRACE_LEVEL_NONE        0
+#define TRACE_LEVEL_CRITICAL    1
+#define TRACE_LEVEL_FATAL       1
+#define TRACE_LEVEL_ERROR       2
+#define TRACE_LEVEL_WARNING     3
+#define TRACE_LEVEL_INFORMATION 4
+#define TRACE_LEVEL_VERBOSE     5
 
-#define WPP_CONTROL_GUIDS                                                   \
-    WPP_DEFINE_CONTROL_GUID(                                                \
-        AmtPtpHidFilterTraceGuid, (eeb34803,f3ec,4bb1,97ce,b42405d7f3c2),   \
-                                                                            \
-        WPP_DEFINE_BIT(TRACE_DRIVER)                                        \
-        WPP_DEFINE_BIT(TRACE_DEVICE)                                        \
-        WPP_DEFINE_BIT(TRACE_QUEUE)                                         \
-        WPP_DEFINE_BIT(TRACE_HID)                                           \
-		WPP_DEFINE_BIT(TRACE_INPUT)									        \
-        )
+// Trace flags
+#define TRACE_DRIVER  0x01
+#define TRACE_DEVICE  0x02
+#define TRACE_QUEUE   0x04
+#define TRACE_HID     0x08
+#define TRACE_INPUT   0x10
 
-#define WPP_FLAG_LEVEL_LOGGER(flag, level)                                  \
-    WPP_LEVEL_LOGGER(flag)
+// TraceEvents stub - does nothing
+#define TraceEvents(level, flags, msg, ...)
 
-#define WPP_FLAG_LEVEL_ENABLED(flag, level)                                 \
-    (WPP_LEVEL_ENABLED(flag) &&                                             \
-     WPP_CONTROL(WPP_BIT_ ## flag).Level >= level)
+// Trace stub
+#define Trace(level, msg, ...)
 
-#define WPP_LEVEL_FLAGS_LOGGER(lvl,flags) \
-    WPP_LEVEL_LOGGER(flags)
-
-#define WPP_LEVEL_FLAGS_ENABLED(lvl, flags) \
-    (WPP_LEVEL_ENABLED(flags) && WPP_CONTROL(WPP_BIT_ ## flags).Level >= lvl)
-
-//           
-// WPP orders static parameters before dynamic parameters. To support the Trace function
-// defined below which sets FLAGS=MYDRIVER_ALL_INFO, a custom macro must be defined to
-// reorder the arguments to what the .tpl configuration file expects.
-//
-#define WPP_RECORDER_FLAGS_LEVEL_ARGS(flags, lvl) WPP_RECORDER_LEVEL_FLAGS_ARGS(lvl, flags)
-#define WPP_RECORDER_FLAGS_LEVEL_FILTER(flags, lvl) WPP_RECORDER_LEVEL_FLAGS_FILTER(lvl, flags)
-
-//
-// This comment block is scanned by the trace preprocessor to define our
-// Trace function.
-//
-// begin_wpp config
-// FUNC Trace{FLAGS=TRACE_DRIVER}(LEVEL, MSG, ...);
-// FUNC TraceEvents(LEVEL, FLAGS, MSG, ...);
-// end_wpp
-//
+// WPP init/cleanup stubs
+#define WPP_INIT_TRACING(DriverObject, RegistryPath)
+#define WPP_CLEANUP(DriverObject)

@@ -140,11 +140,12 @@ PtpFilterInputRequestCompletionCallback(
 
 	const TRACKPAD_FINGER* f;
 	const TRACKPAD_FINGER_TYPE5* f_type5;
+	const MAGIC_MOUSE_FINGER* f_mm2;
 	size_t raw_n, headerSize, fingerprintSize = 0;
 	INT x, y = 0;
 
 	UNREFERENCED_PARAMETER(Target);
-	
+
 	requestContext = (PWORKER_REQUEST_CONTEXT)Context;
 	deviceContext = requestContext->DeviceContext;
 	responseLength = (size_t)(LONG)WdfRequestGetInformation(Request);
@@ -152,7 +153,7 @@ PtpFilterInputRequestCompletionCallback(
 	headerSize = deviceContext->InputHeaderSize;
 	fingerprintSize = deviceContext->InputFingerSize;
 
-	// Pre-flight check 0: Right now we only have Magic Trackpad 2 (BT and USB)
+	// Pre-flight check 0: Right now we only have Magic Trackpad 2 (BT and USB) and Magic Mouse 2 (BT)
 	if (deviceContext->VendorID != HID_VID_APPLE_USB && deviceContext->VendorID != HID_VID_APPLE_BT) {
 		TraceEvents(TRACE_LEVEL_ERROR, TRACE_INPUT, "%!FUNC! Unsupported device entered this routine");
 		WdfDeviceSetFailed(deviceContext->Device, WdfDeviceFailedNoRestart);
@@ -164,6 +165,126 @@ PtpFilterInputRequestCompletionCallback(
 		WdfWorkItemEnqueue(requestContext->DeviceContext->HidTransportRecoveryWorkItem);
 		goto cleanup;
 	}
+
+	// Magic Mouse 2: handle hybrid mouse + PTP reports
+	if (deviceContext->IsMagicMouse2) {
+		// MM2 raw reports contain both optical sensor data (cursor dX/dY in header)
+		// and multitouch finger data (after header). We emit two HID reports:
+		//   1. PTP report (touch surface) — PRIORITY, this is the whole point of the driver
+		//   2. Mouse report (cursor movement) — secondary, if a request is available
+		// PTP is dequeued first to avoid losing touch data when queue has only 1 request.
+
+		// --- PTP touch report (priority) ---
+		if (responseLength >= headerSize &&
+			(responseLength - headerSize) % fingerprintSize == 0 &&
+			responseLength > headerSize) {
+
+			raw_n = (responseLength - headerSize) / fingerprintSize;
+			if (raw_n > PTP_MAX_CONTACT_POINTS) raw_n = PTP_MAX_CONTACT_POINTS;
+
+			status = WdfIoQueueRetrieveNextRequest(deviceContext->HidReadQueue, &ptpRequest);
+			if (NT_SUCCESS(status)) {
+				ptpOutputReport.ReportID = REPORTID_MULTITOUCH;
+				ptpOutputReport.IsButtonClicked = 0;
+
+				KeQueryPerformanceCounter(&currentTSC);
+				tSCDelta = (currentTSC.QuadPart - deviceContext->LastReportTime.QuadPart) / 100;
+				ptpOutputReport.ScanTime = (tSCDelta >= 0xFFFF) ? 0xFFFF : (USHORT)tSCDelta;
+				deviceContext->LastReportTime.QuadPart = currentTSC.QuadPart;
+
+				ptpOutputReport.ContactCount = (UCHAR)raw_n;
+
+				for (size_t i = 0; i < raw_n; i++) {
+					PUCHAR f_base = responseBuffer + headerSize + deviceContext->InputFingerDelta;
+					f_mm2 = (const MAGIC_MOUSE_FINGER*)(f_base + i * fingerprintSize);
+
+					// Parse 12-bit signed X coordinate
+					USHORT raw_x = ((f_mm2->AbsoluteXY & 0x0F) << 8) | f_mm2->AbsoluteX_Low;
+					x = (SHORT)(raw_x << 4) >> 4;
+
+					// Parse 12-bit signed Y coordinate (inverted)
+					USHORT raw_y = (f_mm2->AbsoluteY_Mid << 4) | ((f_mm2->AbsoluteXY & 0xF0) >> 4);
+					y = -((SHORT)(raw_y << 4) >> 4);
+
+					// Remap to 0-based coordinates
+					x = (x - deviceContext->X.min) > 0 ? (x - deviceContext->X.min) : 0;
+					y = (y - deviceContext->Y.min) > 0 ? (y - deviceContext->Y.min) : 0;
+
+					// Extract contact ID (4 bits from two bytes)
+					UCHAR contactId = ((f_mm2->OrientationAndIdHigh & 0x03) << 2) | (f_mm2->SizeAndIdLow >> 6);
+
+					// Touch state: 0x30 = start, 0x40 = drag, 0x00 = lifted
+					UCHAR touchState = f_mm2->StateAndUnknown & 0xF0;
+
+					ptpOutputReport.Contacts[i].ContactID = contactId & 0x0F;
+					ptpOutputReport.Contacts[i].X = (USHORT)x;
+					ptpOutputReport.Contacts[i].Y = (USHORT)y;
+					ptpOutputReport.Contacts[i].TipSwitch = (touchState == MM2_TOUCH_STATE_START || touchState == MM2_TOUCH_STATE_DRAG) ? 1 : 0;
+					ptpOutputReport.Contacts[i].Confidence = (f_mm2->TouchMinor > 0) ? 1 : 0;
+				}
+
+				// Button state from PTP perspective
+				if ((responseBuffer[deviceContext->InputButtonDelta] & 1) != 0) {
+					ptpOutputReport.IsButtonClicked = TRUE;
+				}
+
+				status = WdfRequestRetrieveOutputMemory(ptpRequest, &ptpRequestMemory);
+				if (NT_SUCCESS(status)) {
+					status = WdfMemoryCopyFromBuffer(ptpRequestMemory, 0, (PVOID)&ptpOutputReport, sizeof(PTP_REPORT));
+					if (NT_SUCCESS(status)) {
+						WdfRequestSetInformation(ptpRequest, sizeof(PTP_REPORT));
+						WdfRequestComplete(ptpRequest, STATUS_SUCCESS);
+					}
+					else {
+						WdfRequestComplete(ptpRequest, status);
+					}
+				}
+				else {
+					WdfRequestComplete(ptpRequest, status);
+				}
+			}
+		}
+
+		// --- Mouse cursor report (secondary) ---
+		if (responseLength >= 6) {
+			WDFREQUEST mouseRequest;
+			status = WdfIoQueueRetrieveNextRequest(deviceContext->HidReadQueue, &mouseRequest);
+			if (NT_SUCCESS(status)) {
+				MOUSE_REPORT mouseReport;
+				RtlZeroMemory(&mouseReport, sizeof(MOUSE_REPORT));
+				mouseReport.ReportID = REPORTID_STANDARDMOUSE;
+				mouseReport.Buttons = responseBuffer[MM2_BUTTON_OFFSET] & 0x03;
+
+				// Extract relative X/Y from header bytes 2-5 (16-bit signed LE)
+				mouseReport.X = (SHORT)(responseBuffer[MM2_MOUSE_DX_OFFSET] | (responseBuffer[MM2_MOUSE_DX_OFFSET + 1] << 8));
+				mouseReport.Y = (SHORT)(responseBuffer[MM2_MOUSE_DY_OFFSET] | (responseBuffer[MM2_MOUSE_DY_OFFSET + 1] << 8));
+
+				WDFMEMORY mouseRequestMemory;
+				status = WdfRequestRetrieveOutputMemory(mouseRequest, &mouseRequestMemory);
+				if (NT_SUCCESS(status)) {
+					status = WdfMemoryCopyFromBuffer(mouseRequestMemory, 0, (PVOID)&mouseReport, sizeof(MOUSE_REPORT));
+					if (NT_SUCCESS(status)) {
+						WdfRequestSetInformation(mouseRequest, sizeof(MOUSE_REPORT));
+						WdfRequestComplete(mouseRequest, STATUS_SUCCESS);
+					}
+					else {
+						WdfRequestComplete(mouseRequest, status);
+					}
+				}
+				else {
+					WdfRequestComplete(mouseRequest, status);
+				}
+			}
+			// If no request available, cursor movement for this frame is lost.
+			// This is acceptable — the next frame will carry fresh dX/dY.
+		}
+
+		// Issue next transport read
+		PtpFilterInputIssueTransportRequest(deviceContext->Device);
+		goto cleanup;
+	}
+
+	// === Magic Trackpad 2 path (original logic) ===
 
 	// Pre-flight check 2: the response size should be sane
 	if (responseLength < deviceContext->InputHeaderSize || (responseLength - deviceContext->InputHeaderSize) % deviceContext->InputFingerSize != 0) {
@@ -186,7 +307,7 @@ PtpFilterInputRequestCompletionCallback(
 	// Capture current timestamp and get input delta in 100us unit
 	KeQueryPerformanceCounter(&currentTSC);
 	tSCDelta = (currentTSC.QuadPart - deviceContext->LastReportTime.QuadPart) / 100;
-	ptpOutputReport.ScanTime = (tSCDelta >= 0xFF) ? 0xFF : (USHORT)tSCDelta;
+	ptpOutputReport.ScanTime = (tSCDelta >= 0xFFFF) ? 0xFFFF : (USHORT)tSCDelta;
 	deviceContext->LastReportTime.QuadPart = currentTSC.QuadPart;
 
 	// Report required content
@@ -194,11 +315,13 @@ PtpFilterInputRequestCompletionCallback(
 	raw_n = (responseLength - headerSize) / fingerprintSize;
 	if (raw_n >= PTP_MAX_CONTACT_POINTS) raw_n = PTP_MAX_CONTACT_POINTS;
 	ptpOutputReport.ContactCount = (UCHAR) raw_n;
+
+	// Magic Trackpad 2: 9-byte Type5 finger records
 	for (size_t i = 0; i < raw_n; i++) {
 		PUCHAR f_base = responseBuffer + headerSize + deviceContext->InputFingerDelta;
 		f = (const TRACKPAD_FINGER*)(f_base + i * fingerprintSize);
 		f_type5 = (const TRACKPAD_FINGER_TYPE5*)f;
-		
+
 		USHORT tmp_x = (*((USHORT*)f_type5)) & 0x1fff;
 		unsigned int tmp_y = (INT)(*((unsigned int*) f_type5));
 
@@ -211,9 +334,6 @@ PtpFilterInputRequestCompletionCallback(
 		ptpOutputReport.Contacts[i].X = (USHORT)x;
 		ptpOutputReport.Contacts[i].Y = (USHORT)y;
 		ptpOutputReport.Contacts[i].TipSwitch = ((signed short) (f_type5->TouchMajor) << 1) > 0;
-		// The Microsoft spec says reject any input larger than 25mm. This is not ideal
-		// for Magic Trackpad 2 - so we raised the threshold a bit higher.
-		// Or maybe I used the wrong unit? IDK
 		ptpOutputReport.Contacts[i].Confidence = ((signed short) (f_type5->TouchMinor) << 1) < 345 && ((signed short) (f_type5->TouchMinor) << 1) < 345;
 	}
 

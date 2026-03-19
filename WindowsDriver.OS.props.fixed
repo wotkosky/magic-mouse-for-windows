@@ -1,0 +1,44 @@
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Choose>
+    <When Condition="('$(TargetVersion)'=='Windows10')">
+      <PropertyGroup>
+        <Valid_NTTARGETVERSIONS>0xA00000D;0xA00000C;0xA00000B;0xA00000A;0xA000009;0xA000008;0xA000007;0xA000006;0xA000005;0xA000004;0xA000003;0xA000002;0xA000001;0xA000000</Valid_NTTARGETVERSIONS>
+      </PropertyGroup>
+      <PropertyGroup Condition="'$(_NT_TARGET_VERSION)' == ''">
+        <_NT_TARGET_VERSION>0xA00000D</_NT_TARGET_VERSION>
+      </PropertyGroup>
+      <PropertyGroup>
+        <CURRENT_WIN32_WINNT_VERSION>0x0A00</CURRENT_WIN32_WINNT_VERSION>
+        <SUBSYSTEM_VERSION_LATEST>10.00</SUBSYSTEM_VERSION_LATEST>
+        <DDKSpec>winV10.0</DDKSpec>
+      </PropertyGroup>
+      <Choose>
+        <When Condition="'$(DDKPlatform)' == 'arm64'">
+          <PropertyGroup>
+            <Inf2CatWindowsVersionList Condition="'$(Inf2CatWindowsVersionList)' == ''">Server10_$(DDKPlatform)</Inf2CatWindowsVersionList>
+          </PropertyGroup>
+        </When>
+        <Otherwise>
+          <PropertyGroup>
+            <Inf2CatWindowsVersionList Condition="'$(Inf2CatWindowsVersionList)' == ''">10_$(DDKPlatform)</Inf2CatWindowsVersionList>
+          </PropertyGroup>
+        </Otherwise>
+      </Choose>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <UnknownTargetVersion>true</UnknownTargetVersion>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <PropertyGroup>
+    <_NT_TARGET_VERSION Condition="'$(_NT_TARGET_VERSION)' == ''">0xA00000D</_NT_TARGET_VERSION>
+    <CURRENT_NTDDI_VERSION Condition="'$(CURRENT_NTDDI_VERSION)' == ''">0xA00000D</CURRENT_NTDDI_VERSION>
+    <NTDDI_VERSION Condition="'$(NTDDI_VERSION)' == ''">$(CURRENT_NTDDI_VERSION)</NTDDI_VERSION>
+    <WIN32_WINNT_VERSION Condition="'$(WIN32_WINNT_VERSION)' == ''">$(CURRENT_WIN32_WINNT_VERSION)</WIN32_WINNT_VERSION>
+    <WINVER_VERSION Condition="'$(WINVER_VERSION)' == ''">$(WIN32_WINNT_VERSION)</WINVER_VERSION>
+    <SUBSYSTEM_NATVER Condition="'$(SUBSYSTEM_VERSION)' != ''">$(SUBSYSTEM_VERSION)</SUBSYSTEM_NATVER>
+    <SUBSYSTEM_NATVER Condition="'$(SUBSYSTEM_VERSION)' == ''">$(SUBSYSTEM_VERSION_LATEST)</SUBSYSTEM_NATVER>
+    <OverrideTargetVersionDefines Condition="'$(OverrideTargetVersionDefines)' == ''">false</OverrideTargetVersionDefines>
+  </PropertyGroup>
+</Project>

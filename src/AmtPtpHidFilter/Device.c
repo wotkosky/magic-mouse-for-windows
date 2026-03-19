@@ -124,6 +124,7 @@ PtpFilterPrepareHardware(
     deviceContext->ProductID = 0;
     deviceContext->VersionNumber = 0;
     deviceContext->DeviceConfigured = FALSE;
+    deviceContext->IsMagicMouse2 = FALSE;
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DEVICE, "%!FUNC! Exit, Status = %!STATUS!", status);
     return status;
@@ -310,7 +311,7 @@ PtpFilterConfigureMultiTouch(
         status = STATUS_NOT_SUPPORTED;
         goto exit;
     }
-    if (deviceContext->ProductID != HID_PID_MAGIC_TRACKPAD_2) {
+    if (deviceContext->ProductID != HID_PID_MAGIC_TRACKPAD_2 && deviceContext->ProductID != HID_PID_MAGIC_MOUSE_2) {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DEVICE, "%!FUNC! Product not supported: 0x%x", deviceContext->ProductID);
         status = STATUS_NOT_SUPPORTED;
         goto exit;
@@ -324,6 +325,7 @@ PtpFilterConfigureMultiTouch(
         deviceContext->InputHeaderSize = HOFFSET_TYPE_USB_5;
         deviceContext->InputFingerDelta = FDELTA_TYPE5;
         deviceContext->InputButtonDelta = BOFFSET_TYPE5;
+        deviceContext->IsMagicMouse2 = FALSE;
 
         deviceContext->X.snratio = 250;
         deviceContext->X.min = -3678;
@@ -340,11 +342,36 @@ PtpFilterConfigureMultiTouch(
         pHidPacket->reportBuffer[2] = 0x00;
         pHidPacket->reportBuffer[3] = 0x00;
     }
+    else if (deviceContext->VendorID == HID_VID_APPLE_BT && deviceContext->ProductID == HID_PID_MAGIC_MOUSE_2) {
+        // Magic Mouse 2 over Bluetooth — MUST be checked before generic BT
+        deviceContext->InputFingerSize = MM2_FINGER_SIZE;
+        deviceContext->InputHeaderSize = MM2_BT_HEADER_SIZE;
+        deviceContext->InputFingerDelta = 0;
+        deviceContext->InputButtonDelta = MM2_BUTTON_OFFSET;
+        deviceContext->IsMagicMouse2 = TRUE;
+
+        deviceContext->X.snratio = 250;
+        deviceContext->X.min = MM2_X_MIN;
+        deviceContext->X.max = MM2_X_MAX;
+        deviceContext->Y.snratio = 250;
+        deviceContext->Y.min = MM2_Y_MIN;
+        deviceContext->Y.max = MM2_Y_MAX;
+
+        // Feature report to enable multitouch on BT
+        pHidPacket->reportId = 0xF1;
+        pHidPacket->reportBufferLen = 0x03;
+        pHidPacket->reportBuffer = (PUCHAR)pHidPacket + sizeof(HID_XFER_PACKET);
+        pHidPacket->reportBuffer[0] = 0xF1;
+        pHidPacket->reportBuffer[1] = 0x02;
+        pHidPacket->reportBuffer[2] = 0x01;
+    }
     else if (deviceContext->VendorID == HID_VID_APPLE_BT) {
+        // Magic Trackpad 2 over Bluetooth (generic BT)
         deviceContext->InputFingerSize = FSIZE_TYPE5;
         deviceContext->InputHeaderSize = HOFFSET_TYPE_BTH_5;
         deviceContext->InputFingerDelta = FDELTA_TYPE5;
         deviceContext->InputButtonDelta = BOFFSET_TYPE5;
+        deviceContext->IsMagicMouse2 = FALSE;
 
         deviceContext->X.snratio = 250;
         deviceContext->X.min = -3678;

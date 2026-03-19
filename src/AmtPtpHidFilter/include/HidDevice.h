@@ -83,4 +83,17 @@ typedef struct _TRACKPAD_FINGER_TYPE5
 		UCHAR RawValue;
 	} OrientationAndOrigin;
 } TRACKPAD_FINGER_TYPE5, *PTRACKPAD_FINGER_TYPE5;
+/* Magic Mouse 2 finger structure (8 bytes per finger) */
+typedef struct _MAGIC_MOUSE_FINGER
+{
+	UCHAR AbsoluteX_Low;        /* tdata[0]: low 8 bits of X */
+	UCHAR AbsoluteXY;           /* tdata[1]: [yyyy xxxx] hi 4 bits of X, lo 4 bits of Y */
+	UCHAR AbsoluteY_Mid;        /* tdata[2]: mid 8 bits of Y */
+	UCHAR TouchMajor;           /* tdata[3]: touch area major axis */
+	UCHAR TouchMinor;           /* tdata[4]: touch area minor axis */
+	UCHAR SizeAndIdLow;         /* tdata[5]: [ii ssssss] ID low 2 bits, size 6 bits */
+	UCHAR OrientationAndIdHigh; /* tdata[6]: [oooooo ii] orientation 6 bits, ID high 2 bits */
+	UCHAR StateAndUnknown;      /* tdata[7]: [ssss ????] state 4 bits, unknown 4 bits */
+} MAGIC_MOUSE_FINGER, *PMAGIC_MOUSE_FINGER;
+
 #include <poppack.h>

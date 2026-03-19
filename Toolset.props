@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <WDKContentRoot Condition="'$(WDKContentRoot)'==''">C:\Program Files (x86)\Windows Kits\10\</WDKContentRoot>
+    <WDKBuildFolder>10.0.26100.0</WDKBuildFolder>
+    <IsKernelModeToolset>true</IsKernelModeToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DDKPlatform>x64</DDKPlatform>
+    <DDK_LIB_PATH>$(WDKContentRoot)Lib\$(WDKBuildFolder)\km\x64\</DDK_LIB_PATH>
+    <KMDF_LIB_PATH>$(WDKContentRoot)Lib\wdf\kmdf\x64\</KMDF_LIB_PATH>
+    <KMDF_VER_PATH>1.15</KMDF_VER_PATH>
+    <KernelBufferOverflowLib>BufferOverflowK.lib</KernelBufferOverflowLib>
+    <!-- Pre-set target version to bypass MSBuild 17.14 version comparison bug in WindowsDriver.OS.props -->
+    <_NT_TARGET_VERSION Condition="'$(_NT_TARGET_VERSION)'==''">0xA00000D</_NT_TARGET_VERSION>
+    <CURRENT_NTDDI_VERSION Condition="'$(CURRENT_NTDDI_VERSION)'==''">0xA00000D</CURRENT_NTDDI_VERSION>
+    <CURRENT_WIN32_WINNT_VERSION Condition="'$(CURRENT_WIN32_WINNT_VERSION)'==''">0x0A00</CURRENT_WIN32_WINNT_VERSION>
+    <SUBSYSTEM_VERSION_LATEST Condition="'$(SUBSYSTEM_VERSION_LATEST)'==''">10.00</SUBSYSTEM_VERSION_LATEST>
+    <Valid_NTTARGETVERSIONS>0xA00000D;0xA00000C;0xA00000B;0xA00000A;0xA000009;0xA000008;0xA000007;0xA000006;0xA000005;0xA000004;0xA000003;0xA000002;0xA000001;0xA000000</Valid_NTTARGETVERSIONS>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.MSVC.Toolset.x64.props"/>
+  <Import Project="$(WDKContentRoot)build\$(WDKBuildFolder)\WindowsDriver.OSTargets.props" />
+  <Import Project="$(WDKContentRoot)build\$(WDKBuildFolder)\WindowsDriver.Common.props" />
+  <Import Project="$(WDKContentRoot)build\$(WDKBuildFolder)\WindowsDriver.KernelMode.Default.props" />
+  <Import Condition="'$(DriverType)'!=''" Project="$(WDKContentRoot)build\$(WDKBuildFolder)\WindowsDriver.KernelMode.props" />
+  <Import Project="$(WDKContentRoot)build\$(WDKBuildFolder)\WindowsDriver.KernelMode.LateEvaluation.props" />
+  <Import Project="$(WDKContentRoot)build\$(WDKBuildFolder)\WindowsDriver.LateEvaluation.props" />
+</Project>

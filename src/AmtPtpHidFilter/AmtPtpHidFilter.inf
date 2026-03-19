@@ -8,7 +8,7 @@ Class = HIDClass
 ClassGuid = {745a17a0-74d3-11d0-b6fe-00a0c90f57da}
 Provider=%ManufacturerName%
 CatalogFile=AmtPtpHidFilter.cat
-DriverVer= ; TODO: set DriverVer in stampinf property pages
+DriverVer=03/19/2026,1.0.0.0
 PnpLockdown=1
 
 [DestinationDirs]
@@ -29,22 +29,24 @@ AmtPtpHidFilter.sys  = 1,,
 ;*****************************************
 
 [Manufacturer]
-%ManufacturerName%=Standard,NT$ARCH$.10.0
+%ManufacturerName%=Standard,NTamd64.10.0
 
-[Standard.NT$ARCH$.10.0]
+[Standard.NTamd64.10.0]
 ; Driver migration: if this user installed the old Precision Touch Driver, install the generic HID USB driver for them
 %AmtPtpHidRootDevice.DeviceDesc%=StandardUsbHid_Device, USB\Vid_05ac&Pid_0265&MI_01
 
-; The fact is, you can't filter HIDUSB or friends directly, because they load the export driver called
-; HIDCLASS which overrides their IO Major Function pointers. Therefore we still implement our own HID miniport 
-; transport, but in fact reusing the underlying HID transport (either Bluetooth or USB).
-; Some high-level patches involved to modify the underlying driver IO handlers.
+; Magic Trackpad 2 (Bluetooth and USB)
 %AmtPtpHidFilter.DeviceDesc%=AmtPtpHidFilter_MiniPortDevice, HID\VID_05AC&PID_0265&REV_0855&MI_01&Col01
 %AmtPtpHidFilter.DeviceDesc%=AmtPtpHidFilter_MiniPortDevice, HID\{00001124-0000-1000-8000-00805f9b34fb}_VID&0001004c_PID&0265&Col01
-; To avoid confusions to OS, disable any other collections.
+; Disable trackpad extra collections
 %AmtPtpHidFilter.NullDeviceDesc%=AmtPtpHidFilter_NullDevice, HID\VID_05AC&PID_0265&REV_0855&MI_01&Col02
 %AmtPtpHidFilter.NullDeviceDesc%=AmtPtpHidFilter_NullDevice, HID\VID_05AC&PID_0265&REV_0855&MI_01&Col03
 %AmtPtpHidFilter.NullDeviceDesc%=AmtPtpHidFilter_NullDevice, HID\{00001124-0000-1000-8000-00805f9b34fb}_VID&0001004c_PID&0265&Col02
+
+; Magic Mouse 2 (Bluetooth) - filter on Col01, keep Col02 for basic mouse, null Col03
+%AmtPtpHidFilter.MouseDeviceDesc%=AmtPtpHidFilter_MiniPortDevice, HID\{00001124-0000-1000-8000-00805f9b34fb}_VID&0001004c_PID&0269&Col01
+; Null vendor-specific collection to prevent conflicts
+%AmtPtpHidFilter.NullDeviceDesc%=AmtPtpHidFilter_NullDevice, HID\{00001124-0000-1000-8000-00805f9b34fb}_VID&0001004c_PID&0269&Col03
 
 [FilterDriver_Payload]
 AmtPtpHidFilter.sys
@@ -101,13 +103,14 @@ ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %13%\AmtPtpHidFilter.sys
 
 [AmtPtpHidFilter_wdfsect]
-KmdfLibraryVersion = $KMDFVERSION$
+KmdfLibraryVersion = 1.25
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
-ManufacturerName = "Bingxing Wang"
-DiskName = "Precision Touchpad for Apple Trackpad Installation Disk"
+ManufacturerName = "Lite Tecnologia"
+DiskName = "LiteMagicMouse Driver Installation Disk"
 AmtPtpHidRootDevice.DeviceDesc = "Apple Multi-touch Trackpad HID Device"
 AmtPtpHidFilter.DeviceDesc = "Apple Multi-touch Trackpad HID Filter"
+AmtPtpHidFilter.MouseDeviceDesc = "LiteMagicMouse Precision Touch Filter"
 AmtPtpHidFilter.NullDeviceDesc = "Apple Multi-touch Auxiliary Services"
-AmtPtpHidFilter.SVCDESC = "Apple Multi-touch Trackpad HID Filter Service"
+AmtPtpHidFilter.SVCDESC = "LiteMagicMouse HID Filter Service"

@@ -49,6 +49,14 @@ typedef struct _PTP_REPORT {
 	UCHAR       IsButtonClicked;
 } PTP_REPORT, * PPTP_REPORT;
 
+// Standard mouse Input Report (for Magic Mouse 2 cursor movement)
+typedef struct _MOUSE_REPORT {
+	UCHAR  ReportID;
+	UCHAR  Buttons;
+	SHORT  X;
+	SHORT  Y;
+} MOUSE_REPORT, * PMOUSE_REPORT;
+
 #include <poppack.h>
 
 // HID routines
